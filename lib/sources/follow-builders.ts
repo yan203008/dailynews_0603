@@ -1,94 +1,157 @@
-import fs from "node:fs";
-import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import type { RawArticle } from "./types";
 
-const DEFAULT_ROOT = "/Users/yan/.follow-builders";
+const execFileP = promisify(execFile);
 
-const PROMPT_LABELS: Record<string, string> = {
-  "digest-intro.md": "最终日报组织规则",
-  "summarize-blogs.md": "AI 公司博客总结规则",
-  "summarize-podcast.md": "播客总结规则",
-  "summarize-tweets.md": "X/Twitter 总结规则",
-  "summarize-youtube.md": "YouTube 总结规则",
-  "translate.md": "翻译规则",
-};
+const BASE_URL =
+  "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main";
+const DEFAULT_PROXY = "http://127.0.0.1:7897";
 
-function compactMarkdown(text: string): string {
-  return text
-    .replace(/^#\s+/gm, "")
-    .replace(/```[\s\S]*?```/g, "")
+interface XFeed {
+  generatedAt?: string;
+  x?: Array<{
+    name: string;
+    handle?: string;
+    tweets?: Array<{
+      text: string;
+      createdAt?: string;
+      url: string;
+      likes?: number;
+      retweets?: number;
+      replies?: number;
+      isQuote?: boolean;
+    }>;
+  }>;
+}
+
+interface PodcastFeed {
+  podcasts?: Array<{
+    name: string;
+    title: string;
+    url: string;
+    publishedAt?: string;
+    transcript?: string;
+  }>;
+}
+
+interface BlogFeed {
+  blogs?: Array<{
+    name: string;
+    title: string;
+    url: string;
+    publishedAt?: string | null;
+    author?: string;
+    description?: string;
+    content?: string;
+  }>;
+}
+
+function stripText(text: string | undefined): string {
+  return (text ?? "")
+    .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function fileUrl(filePath: string): string {
-  return `file://${filePath}`;
+function parseDate(value: string | null | undefined): Date | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
-function fileMtime(filePath: string): Date | undefined {
+async function fetchJson<T>(file: string): Promise<T> {
+  const url = `${BASE_URL}/${file}`;
+  const proxy = process.env.FOLLOW_BUILDERS_PROXY ?? DEFAULT_PROXY;
+  const directArgs = ["-sSL", "-m", "25", "--compressed", url];
+  const proxyArgs = proxy
+    ? ["-sSL", "-m", "25", "--compressed", "--proxy", proxy, url]
+    : directArgs;
+
   try {
-    return fs.statSync(filePath).mtime;
+    const { stdout } = await execFileP("curl", directArgs, {
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    return JSON.parse(stdout) as T;
   } catch {
-    return undefined;
+    const { stdout } = await execFileP("curl", proxyArgs, {
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    return JSON.parse(stdout) as T;
   }
+}
+
+function xArticles(sourceId: string, feed: XFeed): RawArticle[] {
+  const articles: RawArticle[] = [];
+  for (const builder of feed.x ?? []) {
+    for (const tweet of builder.tweets ?? []) {
+      const text = stripText(tweet.text);
+      if (!text || !tweet.url) continue;
+      articles.push({
+        sourceId,
+        title: `${builder.name}: ${text.slice(0, 90)}`,
+        url: tweet.url,
+        excerpt: text.slice(0, 300),
+        publishedAt: parseDate(tweet.createdAt),
+        category: "tech",
+        meta: [
+          "X",
+          builder.handle && `${builder.handle}`,
+          typeof tweet.likes === "number" && `${tweet.likes} likes`,
+          typeof tweet.retweets === "number" && `${tweet.retweets} reposts`,
+          typeof tweet.replies === "number" && `${tweet.replies} replies`,
+          tweet.isQuote && "quote",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      });
+    }
+  }
+  return articles;
+}
+
+function podcastArticles(sourceId: string, feed: PodcastFeed): RawArticle[] {
+  return (feed.podcasts ?? [])
+    .filter((podcast) => podcast.title && podcast.url)
+    .map((podcast) => ({
+      sourceId,
+      title: `${podcast.name}: ${podcast.title}`,
+      url: podcast.url,
+      excerpt: stripText(podcast.transcript).slice(0, 300),
+      publishedAt: parseDate(podcast.publishedAt),
+      category: "tech" as const,
+      meta: "Podcast transcript",
+    }));
+}
+
+function blogArticles(sourceId: string, feed: BlogFeed): RawArticle[] {
+  return (feed.blogs ?? [])
+    .filter((blog) => blog.title && blog.url)
+    .map((blog) => ({
+      sourceId,
+      title: `${blog.name}: ${blog.title}`,
+      url: blog.url,
+      excerpt: stripText(blog.description || blog.content).slice(0, 300),
+      publishedAt: parseDate(blog.publishedAt),
+      category: "tech" as const,
+      meta: ["Blog", blog.author].filter(Boolean).join(" · "),
+    }));
 }
 
 export async function fetchFollowBuilders(
   sourceId: string,
 ): Promise<RawArticle[]> {
-  const root = process.env.FOLLOW_BUILDERS_DIR?.trim() || DEFAULT_ROOT;
-  if (!fs.existsSync(root)) {
-    throw new Error(`follow-builders directory not found: ${root}`);
-  }
+  const [xFeed, podcastFeed, blogFeed] = await Promise.all([
+    fetchJson<XFeed>("feed-x.json"),
+    fetchJson<PodcastFeed>("feed-podcasts.json"),
+    fetchJson<BlogFeed>("feed-blogs.json"),
+  ]);
 
-  const articles: RawArticle[] = [];
-  const configPath = path.join(root, "config.json");
-  if (fs.existsSync(configPath)) {
-    const config = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
-      language?: string;
-      frequency?: string;
-      timezone?: string;
-      deliveryTime?: string;
-      delivery?: { method?: string };
-    };
-    const bits = [
-      config.frequency && `频率 ${config.frequency}`,
-      config.timezone && `时区 ${config.timezone}`,
-      config.deliveryTime && `推送时间 ${config.deliveryTime}`,
-      config.language && `语言 ${config.language}`,
-      config.delivery?.method && `输出方式 ${config.delivery.method}`,
-    ].filter(Boolean);
-    articles.push({
-      sourceId,
-      title: "Follow Builders 本地配置",
-      url: fileUrl(configPath),
-      excerpt: bits.join(" · ") || "本地 follow-builders 配置",
-      publishedAt: fileMtime(configPath),
-      category: "tech",
-      meta: root,
-    });
-  }
-
-  const promptsDir = path.join(root, "prompts");
-  if (fs.existsSync(promptsDir)) {
-    const promptFiles = fs
-      .readdirSync(promptsDir)
-      .filter((name) => name.endsWith(".md"))
-      .sort();
-    for (const name of promptFiles) {
-      const promptPath = path.join(promptsDir, name);
-      const body = compactMarkdown(fs.readFileSync(promptPath, "utf8"));
-      articles.push({
-        sourceId,
-        title: `Follow Builders: ${PROMPT_LABELS[name] ?? name}`,
-        url: fileUrl(promptPath),
-        excerpt: body.slice(0, 300),
-        publishedAt: fileMtime(promptPath),
-        category: "tech",
-        meta: name,
-      });
-    }
-  }
-
-  return articles;
+  return [
+    ...xArticles(sourceId, xFeed),
+    ...podcastArticles(sourceId, podcastFeed),
+    ...blogArticles(sourceId, blogFeed),
+  ].sort(
+    (a, b) => (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0),
+  );
 }

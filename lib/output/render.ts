@@ -202,7 +202,7 @@ const SUBCATEGORY_LABELS: Record<string, string> = {
  */
 const SOURCE_DISPLAY_LIMITS: Record<string, number> = {
   "tech:github-trending": 20,
-  "tech:follow-builders": 10,
+  "tech:follow-builders": 40,
   "tech:cn-community": 10,
   "tech:x-viral": 20,
   "tech:trending-papers": 20,
