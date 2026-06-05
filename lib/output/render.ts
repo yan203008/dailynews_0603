@@ -478,6 +478,10 @@ function renderArticleHtml(a: ArticleInput, showSource = false): string {
 </article>`;
 }
 
+function archiveHref(): string {
+  return "../archive.html";
+}
+
 function renderSourceContent(
   category: Category,
   subId: string,
@@ -1208,7 +1212,7 @@ export function renderHtml(
   <header class="report-header">
     <span class="eyebrow">${STR.siteTitle}</span>
     <h1 class="report-title">${date}</h1>
-    ${process.env.WEB_MODE === "true" ? `<a class="archive-link" href="../archive.html">${STR.archiveLink}</a>` : ""}
+    <a class="archive-link" href="${archiveHref()}">${STR.archiveLink}</a>
   </header>
 
   <nav class="tabs" role="tablist">
