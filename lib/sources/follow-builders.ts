@@ -108,11 +108,17 @@ function cronDigestArticles(sourceId: string, digest: string): RawArticle[] {
     if (!title || body.length === 0) return;
     const text = stripText(body.join(" "));
     if (!text) return;
+    const excerpt = body
+      .join("\n")
+      .replace(/\n链接：/g, "\n")
+      .replace(/链接：(https?:\/\/\S+)/g, "$1")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
     articles.push({
       sourceId,
       title,
       url: firstUrl(body.join("\n")) || "https://github.com/zarazhangrui/follow-builders",
-      excerpt: text.slice(0, 500),
+      excerpt: excerpt.slice(0, 1200),
       publishedAt: new Date(),
       category: "tech",
       meta: section,
@@ -140,7 +146,7 @@ function cronDigestArticles(sourceId: string, digest: string): RawArticle[] {
       continue;
     }
     if (!title) continue;
-    body.push(line.replace(/^•\s*/, "").replace(/^👉\s*/, "链接："));
+    body.push(line.replace(/^•\s*/, "").replace(/^👉\s*/, ""));
   }
   flush();
   return articles;

@@ -424,6 +424,17 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function renderInlineTextWithLinks(s: string): string {
+  const escaped = escapeHtml(s);
+  return escaped
+    .replace(
+      /(https?:\/\/[^\s<]+)/g,
+      (url) =>
+        `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`,
+    )
+    .replace(/\n/g, "<br>");
+}
+
 function formatDate(d: Date | undefined): string {
   if (!d) return "";
   try {
@@ -447,7 +458,7 @@ function formatDate(d: Date | undefined): string {
 function renderArticleHtml(a: ArticleInput, showSource = false): string {
   const title = escapeHtml(a.title);
   const url = escapeHtml(a.url);
-  const excerpt = a.excerpt ? escapeHtml(a.excerpt) : "";
+  const excerpt = a.excerpt ? renderInlineTextWithLinks(a.excerpt) : "";
   // Backwards-compat: old sidecar JSON files may carry `cnSummary` instead.
   const summaryText = a.summary ?? (a as unknown as { cnSummary?: string }).cnSummary;
   const summary = summaryText ? escapeHtml(summaryText) : "";
