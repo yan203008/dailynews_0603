@@ -92,7 +92,7 @@
     "type": "api",
     "url": "file:///Users/yan/.follow-builders",
     "category": "tech",
-    "subcategory": "ai-news",
+    "subcategory": "follow-builders",
     "lang": "zh",
     "enabled": true,
     "locales": [
