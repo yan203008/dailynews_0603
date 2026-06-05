@@ -87,6 +87,20 @@
     ]
   },
   {
+    "id": "follow-builders",
+    "name": "Follow Builders",
+    "type": "api",
+    "url": "file:///Users/yan/.follow-builders",
+    "category": "tech",
+    "subcategory": "ai-news",
+    "lang": "zh",
+    "enabled": true,
+    "locales": [
+      "zh"
+    ],
+    "notes": "Local follow-builders skill configuration and prompts. Override path with FOLLOW_BUILDERS_DIR."
+  },
+  {
     "id": "openai-news",
     "name": "OpenAI News",
     "type": "rss",

@@ -1,4 +1,5 @@
 import { fetchAttentionVc } from "./attentionvc";
+import { fetchFollowBuilders } from "./follow-builders";
 import { fetchGithubTrending } from "./github-trending";
 import { fetchHackerNews } from "./hackernews";
 import { fetchHuggingfacePapers } from "./huggingface-papers";
@@ -17,6 +18,7 @@ export async function fetchSource(source: SourceDef): Promise<RawArticle[]> {
   if (source.id === "v2ex-hot") return fetchV2ex(source.id);
   if (source.id === "linuxdo") return fetchLinuxDo(source.id);
   if (source.id === "attentionvc-ai") return fetchAttentionVc(source.id);
+  if (source.id === "follow-builders") return fetchFollowBuilders(source.id);
   if (source.id === "huggingface-papers") return fetchHuggingfacePapers(source.id, source.keywords);
   return fetchRss(source.id, source.url, source.category, {
     useCurl: source.useCurl,
