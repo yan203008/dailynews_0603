@@ -4,6 +4,7 @@ import { classifyError, logLlmCall } from "../log";
 import type { LlmRunOptions, LlmRunResult } from "../llm";
 
 export const CLAUDE_MODEL = process.env.CLAUDE_MODEL?.trim() || "sonnet";
+const DEFAULT_TIMEOUT_MS = Number(process.env.CLAUDE_TIMEOUT_MS ?? 300_000);
 
 function resolveCliPath(): string {
   const override = process.env.CLAUDE_CLI_PATH?.trim();
@@ -24,7 +25,7 @@ function resolveCliPath(): string {
 export function runClaudeCli({
   systemPrompt,
   userPrompt,
-  timeoutMs = 180_000,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 }: LlmRunOptions): Promise<LlmRunResult> {
   const cli = resolveCliPath();
   const args = [
@@ -38,7 +39,7 @@ export function runClaudeCli({
 
   return new Promise((resolve, reject) => {
     const child = spawn(cli, args, {
-      shell: true,
+      shell: process.platform === "win32",
       stdio: ["pipe", "pipe", "pipe"],
     });
 
