@@ -1,5 +1,26 @@
 import * as cheerio from "cheerio";
+import { curlFetch } from "./curl-fetch";
 import type { RawArticle } from "./types";
+
+const URL = "https://github.com/trending?since=daily";
+const HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+  Accept: "text/html,application/xhtml+xml",
+};
+
+async function fetchTrendingHtml(): Promise<string> {
+  try {
+    const res = await fetch(URL, {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`GitHub Trending HTTP ${res.status}`);
+    return await res.text();
+  } catch {
+    return curlFetch(URL, HEADERS, 30);
+  }
+}
 
 /**
  * GitHub Trending page (https://github.com/trending) HTML scrape.
@@ -16,13 +37,7 @@ export async function fetchGithubTrending(
   sourceId: string,
   limit = 25,
 ): Promise<RawArticle[]> {
-  const html = await fetch("https://github.com/trending?since=daily", {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      Accept: "text/html,application/xhtml+xml",
-    },
-  }).then((r) => r.text());
+  const html = await fetchTrendingHtml();
 
   const $ = cheerio.load(html);
   const items: RawArticle[] = [];

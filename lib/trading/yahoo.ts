@@ -60,10 +60,9 @@ interface YahooChartResp {
 export async function fetchTickerData(
   symbol: string,
 ): Promise<TickerRawData | null> {
-  const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1y&interval=1d`;
-  const res = await fetch(url, { headers: HEADERS });
-  if (!res.ok) return null;
-  const data = (await res.json()) as YahooChartResp;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1y&interval=1d`;
+  const raw = await curlFetch(url, HEADERS, 20);
+  const data = JSON.parse(raw) as YahooChartResp;
   const r = data.chart?.result?.[0];
   if (!r || !r.meta || !r.timestamp || !r.indicators?.quote?.[0]) return null;
 
@@ -98,3 +97,4 @@ export async function fetchTickerData(
     candles,
   };
 }
+import { curlFetch } from "../sources/curl-fetch";

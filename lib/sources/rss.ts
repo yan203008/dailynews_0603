@@ -3,7 +3,7 @@ import { curlFetch } from "./curl-fetch";
 import type { Category, RawArticle } from "./types";
 
 const parser = new Parser({
-  timeout: 15000,
+  timeout: 25000,
   headers: {
     "User-Agent":
       "Mozilla/5.0 (compatible; DailyBriefBot/1.0; +https://github.com/)",
@@ -34,7 +34,12 @@ export async function fetchRss(
     const xml = await curlFetch(url, CURL_HEADERS);
     feed = await parser.parseString(xml);
   } else {
-    feed = await parser.parseURL(url);
+    try {
+      feed = await parser.parseURL(url);
+    } catch {
+      const xml = await curlFetch(url, CURL_HEADERS, 30);
+      feed = await parser.parseString(xml);
+    }
   }
 
   return (feed.items ?? [])
