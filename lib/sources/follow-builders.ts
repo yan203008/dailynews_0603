@@ -84,10 +84,22 @@ function latestCronDigestFile(): string | null {
 }
 
 function extractCronDigest(markdown: string): string | null {
+  const headingMatches = Array.from(
+    markdown.matchAll(
+      /^(?:#{1,3}\s*)?(?:\*\*)?AI Builders Digest\s*[—-]\s*(?:\d{4}[-年]\d{1,2}|\d{4})/gim,
+    ),
+  );
   const responseIdx = markdown.lastIndexOf("## Response");
-  const start = responseIdx >= 0 ? responseIdx + "## Response".length : markdown.search(/AI Builders Digest\s+[—-]/);
+  const start =
+    headingMatches.length > 0
+      ? (headingMatches.at(-1)?.index ?? -1)
+      : responseIdx >= 0
+        ? responseIdx + "## Response".length
+        : -1;
   if (start < 0) return null;
   const body = markdown.slice(start).trim();
+  if (/## Error\b|TimeoutError:/i.test(body)) return null;
+  if (!/^(?:📱|📝|🎙️)\s+/m.test(body)) return null;
   const generatedIdx = body.search(/Generated through the Follow Builders skill/i);
   if (generatedIdx < 0) return body;
   return body.slice(0, generatedIdx).trim();
